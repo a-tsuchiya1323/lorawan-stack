@@ -29,6 +29,7 @@ import (
 	"go.thethings.network/lorawan-stack/pkg/events"
 	"go.thethings.network/lorawan-stack/pkg/log"
 	"go.thethings.network/lorawan-stack/pkg/rpcclient"
+	"go.thethings.network/lorawan-stack/pkg/tenant"
 	"go.thethings.network/lorawan-stack/pkg/ttnpb"
 	"go.thethings.network/lorawan-stack/pkg/types"
 	"google.golang.org/grpc"
@@ -160,6 +161,7 @@ func (a *Agent) getSubscriptionFilters() []*packetbroker.RoutingFilter {
 
 func (a *Agent) subscribeUplink(ctx context.Context) error {
 	ctx = log.NewContextWithField(ctx, "namespace", "packetbroker/agent")
+	ctx = tenant.NewContext(ctx, cluster.PacketBrokerTenantID)
 
 	conn, err := a.dialContext(ctx, a.homeNetworkTLSConfig, a.dataPlaneAddress)
 	if err != nil {
