@@ -5873,12 +5873,21 @@
     },
     "description": {
       "package": "pkg/packetbrokeragent",
-      "file": "agent.go"
+      "file": "translation.go"
     }
   },
   "error:pkg/packetbrokeragent:message_identifiers": {
     "translations": {
       "en": "invalid message identifiers"
+    },
+    "description": {
+      "package": "pkg/packetbrokeragent",
+      "file": "agent.go"
+    }
+  },
+  "error:pkg/packetbrokeragent:net_id": {
+    "translations": {
+      "en": "invalid NetID `{net_id}`"
     },
     "description": {
       "package": "pkg/packetbrokeragent",
@@ -5891,7 +5900,7 @@
     },
     "description": {
       "package": "pkg/packetbrokeragent",
-      "file": "agent.go"
+      "file": "encryption.go"
     }
   },
   "error:pkg/packetbrokeragent:no_tls_certificate": {
@@ -5909,7 +5918,7 @@
     },
     "description": {
       "package": "pkg/packetbrokeragent",
-      "file": "agent.go"
+      "file": "translation.go"
     }
   },
   "error:pkg/pfconfig/basicstationlns:frequency_plan": {
