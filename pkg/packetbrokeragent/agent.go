@@ -175,7 +175,10 @@ func (a *Agent) getSubscriptionFilters() []*packetbroker.RoutingFilter {
 }
 
 func (a *Agent) subscribeUplink(ctx context.Context) error {
-	ctx = log.NewContextWithField(ctx, "namespace", "packetbroker/agent")
+	ctx = log.NewContextWithFields(ctx, log.Fields(
+		"namespace", "packetbroker/agent",
+		"home_network_net_id", a.netID,
+	))
 	ctx = tenant.NewContext(ctx, cluster.PacketBrokerTenantID)
 
 	conn, err := a.dialContext(ctx, a.homeNetworkTLSConfig, a.dataPlaneAddress)
@@ -193,7 +196,8 @@ func (a *Agent) subscribeUplink(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.FromContext(ctx).Debug("Subscribed as Home Network")
+	logger := log.FromContext(ctx)
+	logger.Info("Subscribed as Home Network")
 
 	for {
 		msg, err := stream.Recv()
@@ -213,19 +217,9 @@ func (a *Agent) subscribeUplink(ctx context.Context) error {
 			"from_forwarder_id", msg.ForwarderId,
 		))
 		if err := a.handleUplink(ctx, up); err != nil {
-			log.FromContext(ctx).WithError(err).Debug("Failed to handle uplink message")
+			logger.WithError(err).Debug("Failed to handle incoming uplink message")
 		}
 	}
-}
-
-var errNoPHYPayload = errors.DefineFailedPrecondition("no_phy_payload", "no PHYPayload in message")
-
-func (a *Agent) decryptUplink(ctx context.Context, msg *packetbroker.UplinkMessage) error {
-	// TODO: Obtain KEK, decrypt PHYPayload and gateway metadata (https://github.com/TheThingsIndustries/lorawan-stack/issues/1919).
-	if msg.PhyPayload.GetPlain() == nil {
-		return errNoPHYPayload
-	}
-	return nil
 }
 
 var errMessageIdentifiers = errors.DefineFailedPrecondition("message_identifiers", "invalid message identifiers")
@@ -235,10 +229,10 @@ func (a *Agent) handleUplink(ctx context.Context, msg *packetbroker.UplinkMessag
 	logger := log.FromContext(ctx)
 
 	if err := a.decryptUplink(ctx, msg); err != nil {
-		logger.WithError(err).Debug("Failed to decrypt message")
+		logger.WithError(err).Warn("Failed to decrypt message")
 		return err
 	}
-	logger.Debug("Received uplink message")
+	logger.Info("Received uplink message")
 
 	ids, err := lorawan.GetUplinkMessageIdentifiers(msg.PhyPayload.GetPlain())
 	if err != nil {
@@ -257,12 +251,14 @@ func (a *Agent) handleUplink(ctx context.Context, msg *packetbroker.UplinkMessag
 
 	up, err := fromPBUplink(ctx, msg, receivedAt)
 	if err != nil {
+		logger.WithError(err).Warn("Failed to convert incoming uplink message")
 		return err
 	}
 
 	for _, filler := range a.contextFillers {
 		var err error
 		if ctx, err = filler(ctx, ids); err != nil {
+			logger.WithError(err).Warn("Failed to fill end device identifiers context for incoming uplink message")
 			return err
 		}
 	}
