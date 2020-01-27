@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Access Tokens are now linked to User Sessions.
   - This requires a database migration (`ttn-lw-stack is-db migrate`) because of the added columns.
 - Responsive side navigation (inside entity views) to the Console.
-- Packet Broker Agent to subscribe to uplink traffic from Packet Broker. See `pba` configuration section.
+- Packet Broker Agent to subscribe to uplink traffic from and publish uplink traffic to Packet Broker. See `pba` configuration section.
 
 ### Changed
 
