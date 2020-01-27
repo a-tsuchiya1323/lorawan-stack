@@ -42,6 +42,7 @@ import (
 	"go.thethings.network/lorawan-stack/pkg/gatewayserver/io/udp"
 	"go.thethings.network/lorawan-stack/pkg/gatewayserver/upstream"
 	"go.thethings.network/lorawan-stack/pkg/gatewayserver/upstream/ns"
+	"go.thethings.network/lorawan-stack/pkg/gatewayserver/upstream/packetbroker"
 	"go.thethings.network/lorawan-stack/pkg/log"
 	"go.thethings.network/lorawan-stack/pkg/rpcmetadata"
 	"go.thethings.network/lorawan-stack/pkg/rpcmiddleware/hooks"
@@ -147,6 +148,8 @@ func New(c *component.Component, conf *Config, opts ...Option) (gs *GatewayServe
 		switch name {
 		case "cluster":
 			handler = ns.NewHandler(gs.Context(), c, prefix)
+		case "packetbroker":
+			handler = packetbroker.NewHandler(ctx, c, prefix)
 		default:
 			return nil, errInvalidUpstreamName.WithAttributes("name", name)
 		}
@@ -730,7 +733,6 @@ func (gs *GatewayServer) handleLocationUpdates(conn connectionEntry) {
 						},
 					},
 				}, callOpt)
-
 				if err != nil {
 					log.FromContext(ctx).WithError(err).Warn("Failed to update antenna location")
 				}
