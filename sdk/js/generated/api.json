@@ -22132,6 +22132,26 @@
               "responseStreaming": false
             }
           ]
+        },
+        {
+          "name": "NsPba",
+          "longName": "NsPba",
+          "fullName": "ttn.lorawan.v3.NsPba",
+          "description": "The NsPba service connects a Network Server to a Packet Broker Agent.",
+          "methods": [
+            {
+              "name": "PublishDownlink",
+              "description": "PublishDownlink instructs the Packet Broker Agent to publish a downlink message to Packet Broker Router.\nThe Packet Broker Agent returns on the first successful message state change from Packet Broker Router;\nit does not wait for Packet Broker Router to check the routing policy, nor does it wait for the Home Network to\nconfirm downlink message reception, downlink path availability or confirmation from the gateway.",
+              "requestType": "DownlinkMessage",
+              "requestLongType": "DownlinkMessage",
+              "requestFullType": "ttn.lorawan.v3.DownlinkMessage",
+              "requestStreaming": false,
+              "responseType": "Empty",
+              "responseLongType": ".google.protobuf.Empty",
+              "responseFullType": "google.protobuf.Empty",
+              "responseStreaming": false
+            }
+          ]
         }
       ]
     },

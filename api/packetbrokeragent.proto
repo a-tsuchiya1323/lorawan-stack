@@ -25,3 +25,12 @@ option go_package = "go.thethings.network/lorawan-stack/pkg/ttnpb";
 service GsPba {
   rpc PublishUplink(GatewayUplinkMessage) returns (google.protobuf.Empty);
 }
+
+// The NsPba service connects a Network Server to a Packet Broker Agent.
+service NsPba {
+  // PublishDownlink instructs the Packet Broker Agent to publish a downlink message to Packet Broker Router.
+  // The Packet Broker Agent returns on the first successful message state change from Packet Broker Router;
+  // it does not wait for Packet Broker Router to check the routing policy, nor does it wait for the Home Network to
+  // confirm downlink message reception, downlink path availability or confirmation from the gateway.
+  rpc PublishDownlink(DownlinkMessage) returns (google.protobuf.Empty);
+}
