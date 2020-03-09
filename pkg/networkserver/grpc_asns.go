@@ -113,7 +113,7 @@ func matchApplicationDownlinks(session *ttnpb.Session, macState *ttnpb.MACState,
 	if session == nil {
 		return downs, nil
 	}
-	downs, unmatched = partitionDownlinksBySessionKeyIDEquality(session.SessionKeyID, downs...)
+	downs, unmatched = ttnpb.PartitionDownlinksBySessionKeyIDEquality(session.SessionKeyID, downs...)
 	switch {
 	case len(downs) == 0:
 		return unmatched, nil

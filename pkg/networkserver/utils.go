@@ -15,7 +15,6 @@
 package networkserver
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -120,26 +119,6 @@ func searchUplinkChannel(freq uint64, macState *ttnpb.MACState) (uint8, error) {
 		}
 	}
 	return 0, errUplinkChannelNotFound.WithAttributes("frequency", freq)
-}
-
-func partitionDownlinks(p func(down *ttnpb.ApplicationDownlink) bool, downs ...*ttnpb.ApplicationDownlink) (t, f []*ttnpb.ApplicationDownlink) {
-	t, f = downs[:0:0], downs[:0:0]
-	for _, down := range downs {
-		if p(down) {
-			t = append(t, down)
-		} else {
-			f = append(f, down)
-		}
-	}
-	return t, f
-}
-
-func paritionDownlinksBySessionKeyID(p func([]byte) bool, downs ...*ttnpb.ApplicationDownlink) (t, f []*ttnpb.ApplicationDownlink) {
-	return partitionDownlinks(func(down *ttnpb.ApplicationDownlink) bool { return p(down.SessionKeyID) }, downs...)
-}
-
-func partitionDownlinksBySessionKeyIDEquality(id []byte, downs ...*ttnpb.ApplicationDownlink) (t, f []*ttnpb.ApplicationDownlink) {
-	return paritionDownlinksBySessionKeyID(func(downID []byte) bool { return bytes.Equal(downID, id) }, downs...)
 }
 
 func deviceNeedsMACRequestsAt(ctx context.Context, dev *ttnpb.EndDevice, t time.Time, phy band.Band, defaults ttnpb.MACSettings) bool {
