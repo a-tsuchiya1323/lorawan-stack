@@ -2150,6 +2150,15 @@
       "file": "applicationserver.go"
     }
   },
+  "error:pkg/applicationserver:unknown_session": {
+    "translations": {
+      "en": "unknown session"
+    },
+    "description": {
+      "package": "pkg/applicationserver",
+      "file": "applicationserver.go"
+    }
+  },
   "error:pkg/applicationserver:version_unavailable": {
     "translations": {
       "en": "end device version is unavailable in the repository"
