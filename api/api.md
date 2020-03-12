@@ -5045,6 +5045,7 @@ The NsEndDeviceRegistry service allows clients to manage their end devices on th
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `user_ids` | [`UserIdentifiers`](#ttn.lorawan.v3.UserIdentifiers) |  |  |
+| `user_session_id` | [`string`](#string) |  |  |
 | `client_ids` | [`ClientIdentifiers`](#ttn.lorawan.v3.ClientIdentifiers) |  |  |
 | `id` | [`string`](#string) |  |  |
 | `access_token` | [`string`](#string) |  |  |
@@ -5058,6 +5059,7 @@ The NsEndDeviceRegistry service allows clients to manage their end devices on th
 | Field | Validations |
 | ----- | ----------- |
 | `user_ids` | <p>`message.required`: `true`</p> |
+| `user_session_id` | <p>`string.max_len`: `64`</p> |
 | `client_ids` | <p>`message.required`: `true`</p> |
 
 ### <a name="ttn.lorawan.v3.OAuthAccessTokenIdentifiers">Message `OAuthAccessTokenIdentifiers`</a>
@@ -5086,6 +5088,7 @@ The NsEndDeviceRegistry service allows clients to manage their end devices on th
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `user_ids` | [`UserIdentifiers`](#ttn.lorawan.v3.UserIdentifiers) |  |  |
+| `user_session_id` | [`string`](#string) |  |  |
 | `client_ids` | [`ClientIdentifiers`](#ttn.lorawan.v3.ClientIdentifiers) |  |  |
 | `rights` | [`Right`](#ttn.lorawan.v3.Right) | repeated |  |
 | `code` | [`string`](#string) |  |  |
@@ -5099,6 +5102,7 @@ The NsEndDeviceRegistry service allows clients to manage their end devices on th
 | Field | Validations |
 | ----- | ----------- |
 | `user_ids` | <p>`message.required`: `true`</p> |
+| `user_session_id` | <p>`string.max_len`: `64`</p> |
 | `client_ids` | <p>`message.required`: `true`</p> |
 | `redirect_uri` | <p>`string.uri_ref`: `true`</p> |
 

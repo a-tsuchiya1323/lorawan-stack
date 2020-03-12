@@ -20444,6 +20444,24 @@
               }
             },
             {
+              "name": "user_session_id",
+              "description": "",
+              "label": "",
+              "type": "string",
+              "longType": "string",
+              "fullType": "string",
+              "ismap": false,
+              "defaultValue": "",
+              "options": {
+                "validate.rules": [
+                  {
+                    "name": "string.max_len",
+                    "value": 64
+                  }
+                ]
+              }
+            },
+            {
               "name": "client_ids",
               "description": "",
               "label": "",
@@ -20624,6 +20642,24 @@
                   {
                     "name": "message.required",
                     "value": true
+                  }
+                ]
+              }
+            },
+            {
+              "name": "user_session_id",
+              "description": "",
+              "label": "",
+              "type": "string",
+              "longType": "string",
+              "fullType": "string",
+              "ismap": false,
+              "defaultValue": "",
+              "options": {
+                "validate.rules": [
+                  {
+                    "name": "string.max_len",
+                    "value": 64
                   }
                 ]
               }
