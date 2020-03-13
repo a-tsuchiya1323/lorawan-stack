@@ -25,10 +25,13 @@ import Message from '../../../lib/components/message'
 import PropTypes from '../../../lib/prop-types'
 import { GsFrequencyPlansSelect } from '../../containers/freq-plans-select'
 import sharedMessages from '../../../lib/shared-messages'
-import { id as gatewayIdRegexp, address as addressRegexp } from '../../lib/regexp'
+import {
+  id as gatewayIdRegexp,
+  address as addressRegexp,
+  unit as unitRegexp,
+} from '../../lib/regexp'
 import OwnersSelect from '../../containers/owners-select'
-import ScheduleDelayInput from '../../containers/schedule-delay-input'
-
+import DurationInput from '../duration-input'
 const m = defineMessages({
   enforced: 'Enforced',
   dutyCycle: 'Duty Cycle',
@@ -47,6 +50,12 @@ const m = defineMessages({
     'Recommended for all gateways in order to respect spectrum regulations',
   scheduleAnyTimeDelay: 'Schedule Any Time Delay',
   scheduleAnyTimeDescription: 'Configure Gateway Delay (minimum: 130ms, default: 530ms)',
+  miliseconds: 'miliseconds',
+  seconds: 'seconds',
+  minutes: 'minutes',
+  hours: 'hours',
+  delayWarning:
+    'Value of delay too low. The lower bound (130ms) will be used by the Gateway Server.',
 })
 
 const validationSchema = Yup.object().shape({
@@ -77,6 +86,28 @@ const validationSchema = Yup.object().shape({
 
 @bind
 class GatewayDataForm extends React.Component {
+  static propTypes = {
+    children: PropTypes.node.isRequired,
+    error: PropTypes.error,
+    formRef: PropTypes.shape({}),
+    initialValues: PropTypes.shape({}),
+    /** React reference to be passed to the form */
+    onSubmit: PropTypes.func.isRequired,
+    /** SubmitBar contents */
+    update: PropTypes.bool,
+  }
+
+  static defaultProps = {
+    formRef: undefined,
+    update: false,
+    error: '',
+    initialValues: {},
+  }
+
+  state = {
+    shouldDisplayWarning: false,
+  }
+
   onSubmit(values, helpers) {
     const { onSubmit } = this.props
     const castedValues = validationSchema.cast(values)
@@ -84,8 +115,40 @@ class GatewayDataForm extends React.Component {
     onSubmit(castedValues, helpers)
   }
 
+  decodeDelayValue(value) {
+    const duration = value.split(unitRegexp)[0]
+    const unit = value.split(duration)[1]
+
+    this.setState({ shouldDisplayWarning: this.isNotValidDuration(duration, unit) })
+    return {
+      duration: Number(duration),
+      unit,
+    }
+  }
+  // The value of the duration needs to be returned as a single string
+  encodeDelayValue(duration, unit) {
+    this.setState({ shouldDisplayWarning: this.isNotValidDuration(duration, unit) })
+
+    return duration ? `${duration}${unit}` : ''
+  }
+
+  isNotValidDuration(duration, unit) {
+    const durationLowerBound = 130 // set lower bound duration in ms
+    switch (unit) {
+      case 'ms':
+        return duration <= durationLowerBound
+      case 's':
+        return duration <= durationLowerBound / 1000
+      case 'm':
+        return duration <= durationLowerBound / 60000
+      case 'h':
+        return duration <= durationLowerBound / 3600000
+    }
+  }
+
   render() {
     const { update, error, initialValues, formRef, children } = this.props
+    const { shouldDisplayWarning } = this.state
 
     return (
       <Form
@@ -164,10 +227,20 @@ class GatewayDataForm extends React.Component {
           label={m.enforced}
           description={m.enforceDutyCycleDescription}
         />
-        <ScheduleDelayInput
+        <Form.Field
           title={m.scheduleAnyTimeDelay}
           name="schedule_anytime_delay"
+          component={DurationInput}
           description={m.scheduleAnyTimeDescription}
+          units={[
+            { label: m.miliseconds, value: 'ms' },
+            { label: m.seconds, value: 's' },
+            { label: m.minutes, value: 'm' },
+            { label: m.hours, value: 'h' },
+          ]}
+          encode={this.encodeDelayValue}
+          decode={this.decodeDelayValue}
+          warning={shouldDisplayWarning ? m.delayWarning : undefined}
           required
         />
         <Message component="h4" content={sharedMessages.gatewayUpdateOptions} />
@@ -188,24 +261,6 @@ class GatewayDataForm extends React.Component {
       </Form>
     )
   }
-}
-
-GatewayDataForm.propTypes = {
-  children: PropTypes.node.isRequired,
-  error: PropTypes.error,
-  formRef: PropTypes.shape({}),
-  initialValues: PropTypes.shape({}),
-  /** React reference to be passed to the form */
-  onSubmit: PropTypes.func.isRequired,
-  /** SubmitBar contents */
-  update: PropTypes.bool,
-}
-
-GatewayDataForm.defaultProps = {
-  formRef: undefined,
-  update: false,
-  error: '',
-  initialValues: {},
 }
 
 export default GatewayDataForm
