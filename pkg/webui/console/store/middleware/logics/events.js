@@ -92,7 +92,9 @@ const createEventsConnectLogics = function(reducerName, entityName, onEventsStar
           channel.on('close', () => dispatch(stopEvents(id)))
         } catch (error) {
           if (isUnauthenticatedError(error)) {
-            dispatch(user.logoutSuccess())
+            // The user is no longer authenticated; reinitiate the auth flow
+            // by refreshing the page
+            window.location.reload()
           } else {
             dispatch(startEventsFailure(id, error))
           }
