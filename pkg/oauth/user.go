@@ -17,12 +17,15 @@ package oauth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"runtime/trace"
 	"time"
 
 	"github.com/gogo/protobuf/types"
 	echo "github.com/labstack/echo/v4"
+	osin "github.com/openshift/osin"
 	"go.thethings.network/lorawan-stack/pkg/auth"
 	"go.thethings.network/lorawan-stack/pkg/errors"
 	"go.thethings.network/lorawan-stack/pkg/events"
@@ -207,16 +210,61 @@ func (s *server) Login(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+var (
+	errInvalidLogoutRedirectURI = errors.DefineInvalidArgument(
+		"invalid_logout_redirect_uri",
+		"the redirect URI did not match the one(s) defined in the client",
+	)
+	errMissingAccessTokenIDParam = errors.DefinePermissionDenied(
+		"missing_param_access_token_id",
+		"access token ID was not provided",
+	)
+)
+
 func (s *server) Logout(c echo.Context) error {
 	ctx := c.Request().Context()
-	session, err := s.getSession(c)
+	accessTokenID := c.QueryParam("access_token_id")
+	var redirectURI = s.config.UI.MountPath()
+	if accessTokenID == "" {
+		return errMissingAccessTokenIDParam
+	}
+	at, err := s.store.GetAccessToken(ctx, accessTokenID)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	if at != nil {
+		client, err := s.store.GetClient(ctx, &at.ClientIDs, &types.FieldMask{Paths: []string{"logout_redirect_uris"}})
+		if err != nil {
+			return err
+		}
+		redirectParam := c.QueryParam("post_logout_redirect_uri")
+		if redirectParam == "" {
+			redirectURI = client.LogoutRedirectURIs[0]
+		} else {
+			for _, uri := range client.LogoutRedirectURIs {
+				redirectURI, err = osin.ValidateUri(uri, redirectParam)
+			}
+			if err != nil {
+				return errInvalidLogoutRedirectURI.WithCause(err)
+			}
+		}
+
+		if err = s.store.DeleteAccessToken(ctx, accessTokenID); err != nil {
+			return err
+		}
+		s.removeAuthCookie(c)
+		events.Publish(evtUserLogout(ctx, at.UserIDs, nil))
+		if err = s.store.DeleteSession(ctx, &at.UserIDs, at.UserSessionID); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	url, err := url.Parse(redirectURI)
 	if err != nil {
 		return err
 	}
-	events.Publish(evtUserLogout(ctx, session.UserIdentifiers, nil))
-	if err = s.store.DeleteSession(ctx, &session.UserIdentifiers, session.SessionID); err != nil {
-		return err
-	}
-	s.removeAuthCookie(c)
-	return c.NoContent(http.StatusNoContent)
+	return c.Redirect(http.StatusFound, fmt.Sprintf("%s?%s", url.Path, url.RawQuery))
 }
