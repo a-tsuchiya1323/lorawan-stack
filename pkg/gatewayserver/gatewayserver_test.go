@@ -89,6 +89,9 @@ func TestGatewayServer(t *testing.T) {
 	statsRedisClient, statsFlush := test.NewRedis(t, "gatewayserver_test")
 	defer statsFlush()
 	defer statsRedisClient.Close()
+	statsRegistry := &gsredis.GatewayConnectionStatsRegistry{
+		Redis: statsRedisClient,
+	}
 	config := &gatewayserver.Config{
 		RequireRegisteredGateways:         false,
 		UpdateGatewayLocationDebounceTime: 0,
@@ -113,9 +116,7 @@ func TestGatewayServer(t *testing.T) {
 			WSPingInterval: wsPingInterval,
 		},
 		UpdateConnectionStatsDebounceTime: 0,
-		Stats: &gsredis.GatewayConnectionStatsRegistry{
-			Redis: statsRedisClient,
-		},
+		Stats:                             statsRegistry,
 	}
 	gs, err := gatewayserver.New(c, config)
 	if !a.So(err, should.BeNil) {
@@ -1041,9 +1042,12 @@ func TestGatewayServer(t *testing.T) {
 								time.Sleep(timeout)
 							}
 
+							time.Sleep(2 * timeout)
+
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
-							gs.UpdateConnectionStats(ctx, conn)
+							a.So(conn.Stats(), should.NotBeNil)
+							conn.UpdateStats(statsRegistry)
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
@@ -1307,9 +1311,12 @@ func TestGatewayServer(t *testing.T) {
 								t.Fatal("Expected downlink timeout")
 							}
 
+							time.Sleep(2 * timeout)
+
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
-							gs.UpdateConnectionStats(ctx, conn)
+							a.So(conn.Stats(), should.NotBeNil)
+							conn.UpdateStats(statsRegistry)
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {

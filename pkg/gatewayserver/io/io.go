@@ -90,6 +90,29 @@ type Connection struct {
 
 	statsChangedCh chan struct{}
 	locCh          chan struct{}
+
+	lastUpdate LastUpdate
+}
+
+// GatewayConnectionStatsRegistry is the interface of the GatewayConnectionStats as seen by the Connection.
+type GatewayConnectionStatsRegistry interface {
+	// Set updates or clears the connection stats
+	Set(ctx context.Context, ids ttnpb.GatewayIdentifiers, stats *ttnpb.GatewayConnectionStats, update Traffic) error
+}
+
+// LastUpdate holds the timestamps for the latest update for each message type.
+type LastUpdate struct {
+	Up, Down, Status time.Time
+}
+
+// Traffic describes the type of traffic.
+type Traffic struct {
+	Up, Down, Status bool
+}
+
+// IsZero returns true if all timestamps are zero.
+func (u LastUpdate) IsZero() bool {
+	return u.Up.IsZero() && u.Down.IsZero() && u.Status.IsZero()
 }
 
 var (
@@ -286,6 +309,7 @@ var (
 	errDataRate         = errors.DefineInvalidArgument("data_rate", "no data rate with index `{index}`")
 	errTooLong          = errors.DefineInvalidArgument("too_long", "the payload length `{payload_length}` exceeds maximum `{maximum_length}` at data rate index `{data_rate_index}`")
 	errTxSchedule       = errors.DefineAborted("tx_schedule", "failed to schedule")
+	errNoStatsRegistry  = errors.DefineNotFound("no_stats_registry", "no stats registry set")
 )
 
 func getDownlinkPath(path *ttnpb.DownlinkPath, class ttnpb.Class) (ids ttnpb.GatewayAntennaIdentifiers, uplinkTimestamp uint32, err error) {
@@ -313,6 +337,8 @@ func (c *Connection) SendDown(msg *ttnpb.DownlinkMessage) error {
 	case c.downCh <- msg:
 		atomic.AddUint64(&c.downlinks, 1)
 		atomic.StoreInt64(&c.lastDownlinkTime, time.Now().UnixNano())
+
+		c.notifyStatsChanged()
 	default:
 		return errBufferFull
 	}
@@ -625,4 +651,36 @@ func (c *Connection) notifyStatsChanged() {
 	case c.statsChangedCh <- struct{}{}:
 	default:
 	}
+}
+
+// UpdateStats updates the connection stats of the gateway
+func (c *Connection) UpdateStats(r GatewayConnectionStatsRegistry) error {
+	if r == nil {
+		return errNoStatsRegistry
+	}
+
+	stats := c.Stats()
+	traffic := Traffic{}
+
+	// Update based on timestamps
+	traffic.Up = stats.LastUplinkReceivedAt != nil && stats.LastUplinkReceivedAt.After(c.lastUpdate.Up)
+	traffic.Down = stats.LastDownlinkReceivedAt != nil && stats.LastDownlinkReceivedAt.After(c.lastUpdate.Down)
+	traffic.Status = stats.LastStatusReceivedAt != nil && stats.LastStatusReceivedAt.After(c.lastUpdate.Status)
+
+	if traffic.Up {
+		c.lastUpdate.Up = *stats.LastUplinkReceivedAt
+	}
+	if traffic.Down {
+		c.lastUpdate.Down = *stats.LastDownlinkReceivedAt
+	}
+	if traffic.Status {
+		c.lastUpdate.Status = *stats.LastStatusReceivedAt
+	}
+
+	return r.Set(c.ctx, c.gateway.GatewayIdentifiers, stats, traffic)
+}
+
+// ClearStats clears the connection statistics of a gateway.
+func (c *Connection) ClearStats(r GatewayConnectionStatsRegistry) error {
+	return r.Set(c.ctx, c.gateway.GatewayIdentifiers, nil, Traffic{})
 }
