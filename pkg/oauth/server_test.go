@@ -62,11 +62,12 @@ var (
 		UserIdentifiers: ttnpb.UserIdentifiers{UserID: "user"},
 	}
 	mockClient = &ttnpb.Client{
-		ClientIdentifiers: ttnpb.ClientIdentifiers{ClientID: "client"},
-		State:             ttnpb.STATE_APPROVED,
-		Grants:            []ttnpb.GrantType{ttnpb.GRANT_AUTHORIZATION_CODE, ttnpb.GRANT_REFRESH_TOKEN},
-		RedirectURIs:      []string{"https://uri/callback", "http://uri/callback"},
-		Rights:            []ttnpb.Right{ttnpb.RIGHT_USER_INFO},
+		ClientIdentifiers:  ttnpb.ClientIdentifiers{ClientID: "client"},
+		State:              ttnpb.STATE_APPROVED,
+		Grants:             []ttnpb.GrantType{ttnpb.GRANT_AUTHORIZATION_CODE, ttnpb.GRANT_REFRESH_TOKEN},
+		RedirectURIs:       []string{"https://uri/callback", "http://uri/callback"},
+		LogoutRedirectURIs: []string{"https://uri/logout-callback", "http://uri/logout-callback", "http://uri/alternative-logout-callback"},
+		Rights:             []ttnpb.Right{ttnpb.RIGHT_USER_INFO},
 	}
 	mockAccessToken = &ttnpb.OAuthAccessToken{
 		UserIDs:       ttnpb.UserIdentifiers{UserID: "user"},
@@ -136,10 +137,10 @@ func TestOAuthFlow(t *testing.T) {
 		ExpectedBody     string
 	}{
 		{
-			Method:       "GET",
-			Path:         "/oauth",
-			ExpectedCode: http.StatusOK,
-			ExpectedBody: "The Things Network OAuth",
+			Method:           "GET",
+			Path:             "/oauth",
+			ExpectedCode:     http.StatusFound,
+			ExpectedRedirect: "/oauth/login",
 		},
 		{
 			Method:           "GET",
@@ -157,12 +158,6 @@ func TestOAuthFlow(t *testing.T) {
 			Name:         "GET me without auth",
 			Method:       "GET",
 			Path:         "/oauth/api/me",
-			ExpectedCode: http.StatusUnauthorized,
-		},
-		{
-			Name:         "logout without auth",
-			Method:       "POST",
-			Path:         "/oauth/api/auth/logout",
 			ExpectedCode: http.StatusUnauthorized,
 		},
 		{
@@ -401,17 +396,68 @@ func TestOAuthFlow(t *testing.T) {
 			Name: "logout",
 			StoreSetup: func(s *mockStore) {
 				s.res.session = mockSession
-				s.res.user = mockUser
+				s.res.client = mockClient
+				s.res.accessToken = mockAccessToken
 			},
-			Method:       "POST",
-			Path:         "/oauth/api/auth/logout",
-			ExpectedCode: http.StatusNoContent,
+			Method:           "GET",
+			Path:             "/oauth/logout?access_token_id=access-token-id&post_logout_redirect_uri=http://uri/alternative-logout-callback",
+			ExpectedCode:     http.StatusFound,
+			ExpectedRedirect: "/alternative-logout-callback",
 			StoreCheck: func(t *testing.T, s *mockStore) {
 				a := assertions.New(t)
 				a.So(s.calls, should.Contain, "DeleteSession")
-				a.So(s.req.userIDs.GetUserID(), should.Equal, "user")
-				a.So(s.req.sessionID, should.Equal, "session_id")
+				a.So(s.calls, should.Contain, "GetAccessToken")
+				a.So(s.calls, should.Contain, "DeleteAccessToken")
+				a.So(s.calls, should.Contain, "GetClient")
 			},
+		},
+		{
+			Name: "logout without redirect uri",
+			StoreSetup: func(s *mockStore) {
+				s.res.session = mockSession
+				s.res.client = mockClient
+				s.res.accessToken = mockAccessToken
+			},
+			Method:           "GET",
+			Path:             "/oauth/logout?access_token_id=access-token-id",
+			ExpectedCode:     http.StatusFound,
+			ExpectedRedirect: "/logout-callback",
+			StoreCheck: func(t *testing.T, s *mockStore) {
+				a := assertions.New(t)
+				a.So(s.calls, should.Contain, "DeleteSession")
+				a.So(s.calls, should.Contain, "GetAccessToken")
+				a.So(s.calls, should.Contain, "DeleteAccessToken")
+				a.So(s.calls, should.Contain, "GetClient")
+			},
+		},
+		{
+			Name: "logout with invalid redirect uri",
+			StoreSetup: func(s *mockStore) {
+				s.res.session = mockSession
+				s.res.client = mockClient
+				s.res.accessToken = mockAccessToken
+			},
+			Method:       "GET",
+			Path:         "/oauth/logout?access_token_id=access-token-id&post_logout_redirect_uri=http://uri/false-callback",
+			ExpectedCode: http.StatusBadRequest,
+			StoreCheck: func(t *testing.T, s *mockStore) {
+				a := assertions.New(t)
+				a.So(s.calls, should.NotContain, "DeleteSession")
+				a.So(s.calls, should.NotContain, "DeleteAccessToken")
+				a.So(s.calls, should.Contain, "GetAccessToken")
+				a.So(s.calls, should.Contain, "GetClient")
+			},
+		},
+		{
+			Name: "logout without access token",
+			StoreSetup: func(s *mockStore) {
+				s.res.session = mockSession
+				s.res.client = mockClient
+				s.res.accessToken = mockAccessToken
+			},
+			Method:       "GET",
+			Path:         "/oauth/logout",
+			ExpectedCode: http.StatusForbidden,
 		},
 	} {
 		name := tt.Name
