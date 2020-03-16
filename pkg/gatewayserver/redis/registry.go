@@ -16,7 +16,11 @@ package redis
 
 import (
 	"context"
+	"runtime/trace"
 
+	"github.com/go-redis/redis"
+	"go.thethings.network/lorawan-stack/pkg/errors"
+	"go.thethings.network/lorawan-stack/pkg/gatewayserver/io"
 	ttnredis "go.thethings.network/lorawan-stack/pkg/redis"
 	"go.thethings.network/lorawan-stack/pkg/ttnpb"
 	"go.thethings.network/lorawan-stack/pkg/unique"
@@ -27,28 +31,108 @@ type GatewayConnectionStatsRegistry struct {
 	Redis *ttnredis.Client
 }
 
-func (r *GatewayConnectionStatsRegistry) key(uid string) string {
-	return r.Redis.Key("uid", uid)
+var (
+	down        = "down"
+	up          = "up"
+	status      = "status"
+	errNotFound = errors.DefineNotFound("stats_not_found", "Gateway Stats not found")
+)
+
+func (r *GatewayConnectionStatsRegistry) key(which string, uid string) string {
+	return r.Redis.Key(which, "uid", uid)
 }
 
 // Set sets or clears the connection stats for a gateway.
-func (r *GatewayConnectionStatsRegistry) Set(ctx context.Context, ids ttnpb.GatewayIdentifiers, stats *ttnpb.GatewayConnectionStats) error {
+func (r *GatewayConnectionStatsRegistry) Set(ctx context.Context, ids ttnpb.GatewayIdentifiers, stats *ttnpb.GatewayConnectionStats, update io.Traffic) error {
 	uid := unique.ID(ctx, ids)
+
+	defer trace.StartRegion(ctx, "set gateway connection stats").End()
+
+	var err error
+
 	if stats == nil {
-		return r.Redis.Del(r.key(uid)).Err()
+		// Delete if nil
+		err = r.Redis.Del(r.key(up, uid), r.key(down, uid), r.key(status, uid)).Err()
+	} else {
+		// Update (pipelined for better performance) otherwise
+		_, err = r.Redis.Pipelined(func(p redis.Pipeliner) error {
+			if update.Up {
+				if _, err = ttnredis.SetProto(p, r.key(up, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			if update.Down {
+				if _, err = ttnredis.SetProto(p, r.key(down, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			if update.Status {
+				if _, err = ttnredis.SetProto(p, r.key(status, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			if !update.Up && !update.Down && !update.Status {
+				if _, err = ttnredis.SetProto(p, r.key(status, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	}
 
-	_, err := ttnredis.SetProto(r.Redis, r.key(uid), stats, 0)
-	return err
+	if err != nil {
+		return ttnredis.ConvertError(err)
+	}
+	return nil
 }
 
 // Get returns the connection stats for a gateway.
 func (r *GatewayConnectionStatsRegistry) Get(ctx context.Context, ids ttnpb.GatewayIdentifiers) (*ttnpb.GatewayConnectionStats, error) {
 	uid := unique.ID(ctx, ids)
+	result := &ttnpb.GatewayConnectionStats{}
 	stats := &ttnpb.GatewayConnectionStats{}
-	err := ttnredis.GetProto(r.Redis, r.key(uid)).ScanProto(stats)
+
+	retrieved, err := r.Redis.MGet(r.key(up, uid), r.key(down, uid), r.key(status, uid)).Result()
 	if err != nil {
-		stats = nil
+		return nil, ttnredis.ConvertError(err)
 	}
-	return stats, err
+
+	if retrieved[0] == nil && retrieved[1] == nil && retrieved[2] == nil {
+		return nil, errNotFound
+	}
+
+	// uplink stats
+	if retrieved[0] != nil {
+		if ttnredis.UnmarshalProto(retrieved[0].(string), stats) == nil {
+			result.LastUplinkReceivedAt = stats.LastUplinkReceivedAt
+			result.UplinkCount = stats.UplinkCount
+			result.RoundTripTimes = stats.RoundTripTimes
+		} else {
+			return nil, errNotFound
+		}
+	}
+
+	// downlink stats
+	if retrieved[1] != nil {
+		if ttnredis.UnmarshalProto(retrieved[1].(string), stats) == nil {
+			result.LastDownlinkReceivedAt = stats.LastDownlinkReceivedAt
+			result.DownlinkCount = stats.DownlinkCount
+		} else {
+			return nil, errNotFound
+		}
+	}
+
+	// gateway status
+	if retrieved[2] != nil {
+		if ttnredis.UnmarshalProto(retrieved[2].(string), stats) == nil {
+			result.ConnectedAt = stats.ConnectedAt
+			result.Protocol = stats.Protocol
+			result.LastStatus = stats.LastStatus
+			result.LastStatusReceivedAt = stats.LastStatusReceivedAt
+		} else {
+			return nil, errNotFound
+		}
+	}
+
+	return result, nil
 }
