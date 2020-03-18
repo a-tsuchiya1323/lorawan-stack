@@ -658,13 +658,19 @@ func (gs *GatewayServer) updateConnStats(conn connectionEntry) {
 	ctx := conn.Context()
 	logger := log.FromContext(ctx)
 
-	if gs.statsRegistry == nil {
-		panic("No stats registry available")
-	}
+	var (
+		lastUpdate io.LastUpdate
+		traffic    io.Traffic
+	)
 
 	defer func() {
 		logger.Debug("Delete connection stats")
-		err := conn.ClearStats(gs.statsRegistry)
+
+		// Unconditionally clear gateway status when disconnecting.
+		// Required for frontends without support for Status (e.g. BasicStation)
+		traffic.Status = true
+
+		err := gs.ClearConnectionStats(conn.Connection, traffic)
 		if err != nil {
 			logger.WithError(err).Error("Failed to delete connection stats")
 		}
@@ -676,7 +682,21 @@ func (gs *GatewayServer) updateConnStats(conn connectionEntry) {
 		case <-conn.StatsChanged():
 		}
 
-		if err := conn.UpdateStats(gs.statsRegistry); err != nil {
+		stats := conn.Stats()
+		if stats.LastUplinkReceivedAt != nil && stats.LastUplinkReceivedAt.After(lastUpdate.Up) {
+			traffic.Up = true
+			lastUpdate.Up = *stats.LastUplinkReceivedAt
+		}
+		if stats.LastDownlinkReceivedAt != nil && stats.LastDownlinkReceivedAt.After(lastUpdate.Down) {
+			traffic.Down = true
+			lastUpdate.Down = *stats.LastDownlinkReceivedAt
+		}
+		if stats.LastStatusReceivedAt != nil && stats.LastStatusReceivedAt.After(lastUpdate.Status) {
+			traffic.Status = true
+			lastUpdate.Status = *stats.LastStatusReceivedAt
+		}
+
+		if err := gs.UpdateConnectionStats(conn.Connection, traffic); err != nil {
 			logger.WithError(err).Error("Failed to update connection stats")
 		}
 
@@ -814,4 +834,14 @@ func (gs *GatewayServer) GetMQTTConfig(ctx context.Context) (*config.MQTT, error
 		return nil, err
 	}
 	return &config.MQTT, nil
+}
+
+// UpdateConnectionStats updates the connection stats for a gateway
+func (gs *GatewayServer) UpdateConnectionStats(conn *io.Connection, traffic io.Traffic) error {
+	return gs.statsRegistry.Set(conn.Context(), conn.Gateway().GatewayIdentifiers, conn.Stats(), traffic)
+}
+
+// ClearConnectionStats clears the connection stats for a gateway
+func (gs *GatewayServer) ClearConnectionStats(conn *io.Connection, traffic io.Traffic) error {
+	return gs.statsRegistry.Set(conn.Context(), conn.Gateway().GatewayIdentifiers, nil, traffic)
 }

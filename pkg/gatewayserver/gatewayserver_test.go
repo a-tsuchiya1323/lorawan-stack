@@ -64,6 +64,8 @@ var (
 
 	timeout        = (1 << 5) * test.Delay
 	wsPingInterval = (1 << 3) * test.Delay
+
+	allTraffic = io.Traffic{Up: true, Down: true, Status: true}
 )
 
 func TestGatewayServer(t *testing.T) {
@@ -1047,7 +1049,7 @@ func TestGatewayServer(t *testing.T) {
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
 							a.So(conn.Stats(), should.NotBeNil)
-							conn.UpdateStats(statsRegistry)
+							gs.UpdateConnectionStats(conn, allTraffic)
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
@@ -1316,7 +1318,7 @@ func TestGatewayServer(t *testing.T) {
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
 							a.So(conn.Stats(), should.NotBeNil)
-							conn.UpdateStats(statsRegistry)
+							gs.UpdateConnectionStats(conn, allTraffic)
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {

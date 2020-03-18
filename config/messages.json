@@ -3581,15 +3581,6 @@
       "file": "io.go"
     }
   },
-  "error:pkg/gatewayserver/io:no_stats_registry": {
-    "translations": {
-      "en": "no stats registry set"
-    },
-    "description": {
-      "package": "pkg/gatewayserver/io",
-      "file": "io.go"
-    }
-  },
   "error:pkg/gatewayserver/io:no_uplink_token": {
     "translations": {
       "en": "no uplink token provided for class A downlink"
