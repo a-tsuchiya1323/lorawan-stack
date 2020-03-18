@@ -49,35 +49,46 @@ func (r *GatewayConnectionStatsRegistry) Set(ctx context.Context, ids ttnpb.Gate
 	defer trace.StartRegion(ctx, "set gateway connection stats").End()
 
 	var err error
-
 	if stats == nil {
-		// Delete if nil
-		err = r.Redis.Del(r.key(up, uid), r.key(down, uid), r.key(status, uid)).Err()
-	} else {
-		// Update (pipelined for better performance) otherwise
 		_, err = r.Redis.Pipelined(func(p redis.Pipeliner) error {
 			if update.Up {
-				if _, err = ttnredis.SetProto(p, r.key(up, uid), stats, 0); err != nil {
+				if err := p.Del(r.key(up, uid)).Err(); err != nil {
 					return err
 				}
 			}
 			if update.Down {
-				if _, err = ttnredis.SetProto(p, r.key(down, uid), stats, 0); err != nil {
+				if err := p.Del(r.key(down, uid)).Err(); err != nil {
 					return err
 				}
 			}
-			if update.Status {
-				if _, err = ttnredis.SetProto(p, r.key(status, uid), stats, 0); err != nil {
-					return err
-				}
-			}
-			if !update.Up && !update.Down && !update.Status {
-				if _, err = ttnredis.SetProto(p, r.key(status, uid), stats, 0); err != nil {
+			if update.Status || (!update.Up && !update.Down) {
+				if err := p.Del(r.key(status, uid)).Err(); err != nil {
 					return err
 				}
 			}
 			return nil
 		})
+	} else {
+		// Update (pipelined for better performance) otherwise
+		_, err = r.Redis.Pipelined(func(p redis.Pipeliner) error {
+			if update.Up {
+				if _, err := ttnredis.SetProto(p, r.key(up, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			if update.Down {
+				if _, err := ttnredis.SetProto(p, r.key(down, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			if update.Status || (!update.Up && !update.Down) {
+				if _, err := ttnredis.SetProto(p, r.key(status, uid), stats, 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
 	}
 
 	if err != nil {
@@ -104,6 +115,10 @@ func (r *GatewayConnectionStatsRegistry) Get(ctx context.Context, ids ttnpb.Gate
 	// uplink stats
 	if retrieved[0] != nil {
 		if ttnredis.UnmarshalProto(retrieved[0].(string), stats) == nil {
+			if retrieved[2] == nil {
+				result.ConnectedAt = stats.ConnectedAt
+				result.Protocol = stats.Protocol
+			}
 			result.LastUplinkReceivedAt = stats.LastUplinkReceivedAt
 			result.UplinkCount = stats.UplinkCount
 			result.RoundTripTimes = stats.RoundTripTimes
@@ -115,6 +130,10 @@ func (r *GatewayConnectionStatsRegistry) Get(ctx context.Context, ids ttnpb.Gate
 	// downlink stats
 	if retrieved[1] != nil {
 		if ttnredis.UnmarshalProto(retrieved[1].(string), stats) == nil {
+			if retrieved[2] == nil {
+				result.ConnectedAt = stats.ConnectedAt
+				result.Protocol = stats.Protocol
+			}
 			result.LastDownlinkReceivedAt = stats.LastDownlinkReceivedAt
 			result.DownlinkCount = stats.DownlinkCount
 		} else {

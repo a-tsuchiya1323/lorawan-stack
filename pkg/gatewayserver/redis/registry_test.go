@@ -104,17 +104,16 @@ func TestRegistry(t *testing.T) {
 		a.So(errors.IsNotFound(err), should.BeTrue)
 
 		// Unset
-		err = registry.Set(ctx, ids, nil, io.Traffic{})
+		err = registry.Set(ctx, ids, nil, allTraffic)
 		a.So(err, should.BeNil)
 		retrieved, err = registry.Get(ctx, ids)
 		a.So(errors.IsNotFound(err), should.BeTrue)
 		a.So(retrieved, should.BeNil)
-
 	})
 
 	t.Run("ClearManyTimes", func(t *testing.T) {
-		a.So(registry.Set(ctx, ids, nil, io.Traffic{}), should.BeNil)
-		a.So(registry.Set(ctx, ids, nil, io.Traffic{}), should.BeNil)
+		a.So(registry.Set(ctx, ids, nil, allTraffic), should.BeNil)
+		a.So(registry.Set(ctx, ids, nil, allTraffic), should.BeNil)
 	})
 
 	t.Run("UpdateUplink", func(t *testing.T) {
@@ -148,6 +147,15 @@ func TestRegistry(t *testing.T) {
 		retrieved, err = registry.Get(ctx, ids)
 		a.So(err, should.BeNil)
 		a.So(retrieved, should.Resemble, stats)
+
+		// Unset uplink
+		stats.LastUplinkReceivedAt = nil
+		stats.UplinkCount = 0
+		err = registry.Set(ctx, ids, nil, io.Traffic{Up: true})
+		a.So(err, should.BeNil)
+		retrieved, err = registry.Get(ctx, ids)
+		a.So(err, should.BeNil)
+		a.So(retrieved, should.Resemble, stats)
 	})
 
 	t.Run("UpdateDownlink", func(t *testing.T) {
@@ -155,7 +163,7 @@ func TestRegistry(t *testing.T) {
 		stats := deepcopy.Copy(initialStats).(*ttnpb.GatewayConnectionStats)
 
 		// Reset stats from previous test
-		a.So(registry.Set(ctx, ids, nil, io.Traffic{}), should.BeNil)
+		a.So(registry.Set(ctx, ids, nil, allTraffic), should.BeNil)
 		a.So(registry.Set(ctx, ids, stats, allTraffic), should.BeNil)
 		retrieved, err := registry.Get(ctx, ids)
 		a.So(err, should.BeNil)
@@ -182,8 +190,16 @@ func TestRegistry(t *testing.T) {
 		a.So(retrieved, should.Resemble, correct)
 
 		// Now update uplink also
-		stats.LastUplinkReceivedAt = &now
 		err = registry.Set(ctx, ids, stats, io.Traffic{Down: true, Up: true})
+		a.So(err, should.BeNil)
+		retrieved, err = registry.Get(ctx, ids)
+		a.So(err, should.BeNil)
+		a.So(retrieved, should.Resemble, stats)
+
+		// Unset downlink
+		stats.LastDownlinkReceivedAt = nil
+		stats.DownlinkCount = 0
+		err = registry.Set(ctx, ids, nil, io.Traffic{Down: true})
 		a.So(err, should.BeNil)
 		retrieved, err = registry.Get(ctx, ids)
 		a.So(err, should.BeNil)
@@ -195,7 +211,7 @@ func TestRegistry(t *testing.T) {
 		stats := deepcopy.Copy(initialStats).(*ttnpb.GatewayConnectionStats)
 
 		// Reset stats from previous test
-		a.So(registry.Set(ctx, ids, nil, io.Traffic{}), should.BeNil)
+		a.So(registry.Set(ctx, ids, nil, allTraffic), should.BeNil)
 		a.So(registry.Set(ctx, ids, stats, allTraffic), should.BeNil)
 		retrieved, err := registry.Get(ctx, ids)
 		a.So(err, should.BeNil)
