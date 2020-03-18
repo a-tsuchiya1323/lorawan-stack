@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -88,12 +89,7 @@ func TestGatewayServer(t *testing.T) {
 		},
 	})
 	c.FrequencyPlans = frequencyplans.NewStore(test.FrequencyPlansFetcher)
-	statsRedisClient, statsFlush := test.NewRedis(t, "gatewayserver_test")
-	defer statsFlush()
-	defer statsRedisClient.Close()
-	statsRegistry := &gsredis.GatewayConnectionStatsRegistry{
-		Redis: statsRedisClient,
-	}
+
 	config := &gatewayserver.Config{
 		RequireRegisteredGateways:         false,
 		UpdateGatewayLocationDebounceTime: 0,
@@ -118,8 +114,17 @@ func TestGatewayServer(t *testing.T) {
 			WSPingInterval: wsPingInterval,
 		},
 		UpdateConnectionStatsDebounceTime: 0,
-		Stats:                             statsRegistry,
 	}
+	if os.Getenv("TEST_REDIS") == "1" {
+		statsRedisClient, statsFlush := test.NewRedis(t, "gatewayserver_test")
+		defer statsFlush()
+		defer statsRedisClient.Close()
+		statsRegistry := &gsredis.GatewayConnectionStatsRegistry{
+			Redis: statsRedisClient,
+		}
+		config.Stats = statsRegistry
+	}
+
 	gs, err := gatewayserver.New(c, config)
 	if !a.So(err, should.BeNil) {
 		t.FailNow()
@@ -1049,7 +1054,9 @@ func TestGatewayServer(t *testing.T) {
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
 							a.So(conn.Stats(), should.NotBeNil)
-							gs.UpdateConnectionStats(conn, allTraffic)
+							if config.Stats != nil {
+								gs.UpdateConnectionStats(conn, allTraffic)
+							}
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
@@ -1318,7 +1325,10 @@ func TestGatewayServer(t *testing.T) {
 							conn, ok := gs.GetConnection(ctx, ids)
 							a.So(ok, should.BeTrue)
 							a.So(conn.Stats(), should.NotBeNil)
-							gs.UpdateConnectionStats(conn, allTraffic)
+
+							if config.Stats != nil {
+								gs.UpdateConnectionStats(conn, allTraffic)
+							}
 
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
