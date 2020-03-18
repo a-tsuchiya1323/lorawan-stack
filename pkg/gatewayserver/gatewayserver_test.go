@@ -560,6 +560,7 @@ func TestGatewayServer(t *testing.T) {
 						upCh := make(chan *ttnpb.GatewayUp)
 						downCh := make(chan *ttnpb.GatewayDown)
 						err := ptc.Link(ctx, t, ctc.ID, ctc.Key, upCh, downCh)
+						time.Sleep(2 * test.Delay)
 						cancel()
 						if errors.IsDeadlineExceeded(err) {
 							if !ptc.TimeoutOnInvalidAuth && !ptc.ValidAuth(ctx, ctc.ID, ctc.Key) {
@@ -603,6 +604,7 @@ func TestGatewayServer(t *testing.T) {
 				upCh := make(chan *ttnpb.GatewayUp)
 				downCh := make(chan *ttnpb.GatewayDown)
 				err := ptc.Link(ctx2, t, id, registeredGatewayKey, upCh, downCh)
+				time.Sleep(2 * test.Delay)
 				cancel2()
 				if !errors.IsDeadlineExceeded(err) {
 					t.Fatalf("Expected deadline exceeded on second connection but have %v", err)
@@ -1045,6 +1047,16 @@ func TestGatewayServer(t *testing.T) {
 							a.So(ok, should.BeTrue)
 							gs.UpdateConnectionStats(ctx, conn)
 
+							for i := 0; i < 5; i++ {
+								stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
+								if !a.So(err, should.BeNil) {
+									t.FailNow()
+								}
+								if stats.UplinkCount == uint64(uplinkCount) {
+									break
+								}
+								time.Sleep(timeout)
+							}
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
 								t.FailNow()
@@ -1311,6 +1323,16 @@ func TestGatewayServer(t *testing.T) {
 							a.So(ok, should.BeTrue)
 							gs.UpdateConnectionStats(ctx, conn)
 
+							for i := 0; i < 5; i++ {
+								stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
+								if !a.So(err, should.BeNil) {
+									t.FailNow()
+								}
+								if stats.DownlinkCount == uint64(downlinkCount) {
+									break
+								}
+								time.Sleep(timeout)
+							}
 							stats, err := statsClient.GetGatewayConnectionStats(statsCtx, &ids)
 							if !a.So(err, should.BeNil) {
 								t.FailNow()

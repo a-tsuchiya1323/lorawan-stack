@@ -16,6 +16,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 
 	ttnredis "go.thethings.network/lorawan-stack/pkg/redis"
 	"go.thethings.network/lorawan-stack/pkg/ttnpb"
@@ -38,6 +39,7 @@ func (r *GatewayConnectionStatsRegistry) Set(ctx context.Context, ids ttnpb.Gate
 		return r.Redis.Del(r.key(uid)).Err()
 	}
 
+	fmt.Println(">>>>>>>>>>>", stats)
 	_, err := ttnredis.SetProto(r.Redis, r.key(uid), stats, 0)
 	return err
 }
