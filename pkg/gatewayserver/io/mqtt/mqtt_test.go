@@ -112,6 +112,8 @@ func TestAuthentication(t *testing.T) {
 			client := mqtt.NewClient(clientOpts)
 			token := client.Connect()
 			if tc.OK {
+				for i := 0; i < 3 && token.WaitTimeout(timeout); i++ {
+				}
 				if !token.WaitTimeout(timeout) {
 					t.Fatal("Connection timeout")
 				}
@@ -165,6 +167,9 @@ func TestTraffic(t *testing.T) {
 	clientOpts.SetPassword(registeredGatewayKey)
 	client := mqtt.NewClient(clientOpts)
 	token := client.Connect()
+
+	for i := 0; i < 3 && token.WaitTimeout(timeout); i++ {
+	}
 	if !token.WaitTimeout(timeout) {
 		t.Fatal("Connection timeout")
 	}
@@ -248,6 +253,8 @@ func TestTraffic(t *testing.T) {
 				buf, err := tc.Message.Marshal()
 				a.So(err, should.BeNil)
 				token := client.Publish(tc.Topic, 1, false, buf)
+				for i := 0; i < 3 && token.WaitTimeout(timeout); i++ {
+				}
 				if !token.WaitTimeout(timeout) {
 					t.Fatal("Publish timeout")
 				}
